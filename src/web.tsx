@@ -29,7 +29,7 @@ const webPlugin = {
             tools.pluginModal({
               title: 'Prompt 预设',
               source: 'prompt',
-              width: 680,
+              width: 800,
               content: (c: HTMLElement) => { c.appendChild(createPanel((m) => tools.toast(m))) },
             })
           })
