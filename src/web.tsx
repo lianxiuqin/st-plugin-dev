@@ -1,10 +1,18 @@
-// agent_plugin_dev/ui-chat-plugin/src/web.tsx —— 前端入口(骨架,Task 5 实现注册表与默认页)
-export default {
+// agent_plugin_dev/ui-chat-plugin/src/web.tsx —— 前端入口:注入 __uiChat__ + 注册 main 插槽对话页
+import { mountChatPlugin } from './boot.ts'
+
+let disposer: { dispose(): void } | null = null
+
+const webPlugin = {
   name: 'ui-chat-plugin',
   mount() {
-    // Task 5:注入 window.__uiChat__ + 注册默认 page/bubble + __uiSlots__.register('main', …)
+    if (disposer) { disposer.dispose(); disposer = null }
+    disposer = mountChatPlugin()
   },
   unmount() {
-    // Task 5:反注册 + delete window.__uiChat__
+    disposer?.dispose()
+    disposer = null
   },
 }
+
+export default webPlugin
