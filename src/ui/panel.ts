@@ -475,7 +475,7 @@ export function createPanel(toast: ToastFn): HTMLElement {
     actionsRow.innerHTML = ''
     const hasForm = state.forms.length > 0
     const newEntryBtn = button('', '新建条目', () => doCreateEntryWizard())
-    const regBtn = button('prp add-reg-btn', '＋ 注册条目', () => void doPickRegistered())
+    const regBtn = button('', '＋ 注册条目', () => void doPickRegistered())
     const deleteFormBtn = button('danger', '删除表单', () => confirmDeleteForm())
     newEntryBtn.disabled = !hasForm
     regBtn.disabled = !hasForm
