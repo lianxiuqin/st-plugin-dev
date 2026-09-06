@@ -38,7 +38,9 @@ export function createPanel(toast: ToastFn): HTMLElement {
   const statusRow = el('div', 'prp status-row')
   statusRow.append(dot, statusText)
   const sendRow = el('div', 'prp row-bottom')
-  sendRow.append(sendBtn, saveOrderBtn, beta, statusRow)
+  const leftBox = el('div', 'prp btn-group-left')
+  leftBox.append(sendBtn, saveOrderBtn, beta)
+  sendRow.append(leftBox, statusRow)
   root.append(formBar, actionsRow, entriesWrap, sendRow)
 
   const setStatus = (msg: string, type: 'success' | 'error' | 'idle') => {
@@ -79,7 +81,7 @@ export function createPanel(toast: ToastFn): HTMLElement {
 
   async function refreshAll(): Promise<void> {
     const cur = current()
-    if (!cur) { renderEmpty('暂无表单,点击「新建表单」开始'); updateSendAndSave(); return }
+    if (!cur) { renderEmpty('暂无表单'); updateSendAndSave(); return }
     try {
       rows = await api.listEntries(cur.id)
       // 首次载入或保存成功后,以服务端序重置内存序(仅当无未保存脏序时)
@@ -122,7 +124,7 @@ export function createPanel(toast: ToastFn): HTMLElement {
       orderedIds = mem
     }
     if (orderedIds.length === 0) {
-      listBox.appendChild(el('div', 'prp empty-state', '当前表单没有条目,点击「新建条目」添加'))
+      listBox.appendChild(el('div', 'prp empty-state', '暂无条目'))
       topSort.layout()
       return
     }
@@ -248,7 +250,7 @@ export function createPanel(toast: ToastFn): HTMLElement {
     const childList = el('div', 'prp block-list')
     detail.appendChild(childList)
     if (children.length === 0) {
-      childList.appendChild(el('div', 'prp block-empty', '暂无子条目,点击下方「新建子条目」'))
+      childList.appendChild(el('div', 'prp block-empty', '暂无子条目'))
     } else {
       for (const c of children) {
         const rowEl = renderChildRow(g, c)
@@ -356,7 +358,7 @@ export function createPanel(toast: ToastFn): HTMLElement {
     if (!cur) return
     try {
       const payload = await api.previewPrompt(cur.id)
-      openResult('预览(静态拼接,注册条目以 JSON 占位符显示,不调用注入)', payload)
+      openResult('预览结果(注册条目为占位符,未发送)', payload)
       setStatus('预览完成', 'success')
     } catch (e) {
       openResult('预览失败', { ok: false, message: (e as Error)?.message || '预览失败' })
@@ -404,7 +406,7 @@ export function createPanel(toast: ToastFn): HTMLElement {
     for (const f of state.forms) {
       const o = document.createElement('option')
       o.value = f.id
-      o.textContent = f.name + (f.id === activeId ? ' ·使用中' : '')
+      o.textContent = f.name // v6:使用中信息移出 option,改由徽标呈现
       if (f.id === state.currentId) o.selected = true
       sel.appendChild(o)
     }
@@ -416,7 +418,10 @@ export function createPanel(toast: ToastFn): HTMLElement {
     })
     const cur = current()
     formBar.appendChild(sel)
-    if (cur) formBar.appendChild(el('span', 'prp pid', `${cur.entryCount} 个条目`))
+    if (cur) {
+      if (cur.id === activeId) formBar.appendChild(el('span', 'prp active-pill', '使用中'))
+      formBar.appendChild(el('span', 'prp pid', `${cur.entryCount} 项`))
+    }
     formBar.appendChild(button('prp text-btn', '改名', () => startRename()))
     formBar.appendChild(button('prp text-btn', '新建表单', () => void doCreateForm()))
   }
@@ -487,12 +492,11 @@ export function createPanel(toast: ToastFn): HTMLElement {
     const { modal, close } = createLayer('min(380px,90vw)')
     headOf(modal, '新建条目', close)
     const body = el('div', 'prp float-body')
-    body.appendChild(el('div', 'prp wizard-tip', '请选择要创建的条目类型'))
     const plainBtn = document.createElement('button')
-    plainBtn.className = 'prp wizard-opt'; plainBtn.type = 'button'; plainBtn.textContent = '普通条目(独立成一条消息)'
+    plainBtn.className = 'prp wizard-opt'; plainBtn.type = 'button'; plainBtn.textContent = '普通条目'
     plainBtn.addEventListener('click', () => { close(); void createPlainEntry() })
     const groupBtn = document.createElement('button')
-    groupBtn.className = 'prp wizard-opt'; groupBtn.type = 'button'; groupBtn.textContent = '父条目(占位,子条目聚合为一条消息)'
+    groupBtn.className = 'prp wizard-opt'; groupBtn.type = 'button'; groupBtn.textContent = '父条目'
     groupBtn.addEventListener('click', () => { close(); createGroupEntry() })
     body.append(plainBtn, groupBtn)
     modal.appendChild(body)
@@ -522,7 +526,7 @@ export function createPanel(toast: ToastFn): HTMLElement {
   function createGroupEntry(): void {
     const id = curId()
     openGroupCreator({
-      title: '新建父条目(选择 role 作为聚合消息角色)',
+      title: '新建父条目',
       onSave: async (input) => {
         try {
           const { entryId } = await api.createEntry(id, { name: input.name, role: input.role, kind: 'group' })
@@ -530,7 +534,7 @@ export function createPanel(toast: ToastFn): HTMLElement {
           await refreshAll()
           const addBtn = listBox.querySelector<HTMLButtonElement>(`.entry-wrap[data-entry-id="${entryId}"] .dashed-btn`)
           addBtn?.focus()
-          toast('已创建父条目,点击「新建子条目」填入内容')
+          toast('已创建父条目')
         } catch (e) { toastError(e) }
       },
     })
