@@ -8,15 +8,16 @@ export type ToolScope = 'bubble' | 'session-head' | 'composer'
 export type RegionSlot = 'page-head' | 'side' | 'composer-top'
 export type RegKind = 'page' | 'bubble' | 'tool' | 'region'
 
-export interface PageItem { name: string; priority: number; render(ctx: ChatPageCtx): HTMLElement | Promise<HTMLElement> }
+export interface PageItem { name: string; priority: number; render(ctx: ChatPageCtx): HTMLElement | Promise<HTMLElement>; unmount?: () => void }
 export interface BubbleItem {
   name: string
   priority: number
   match(role: ChatRole, msg: ChatMessage): boolean
   render(el: HTMLElement, msg: ChatMessage, api: BubbleApi): void | Promise<void>
+  unmount?: () => void
 }
-export interface ToolItem { name: string; scope: ToolScope; priority: number; render(el: HTMLElement, api: ToolApi): void | Promise<void> }
-export interface RegionItem { name: string; slot: RegionSlot; priority: number; render(el: HTMLElement): void | Promise<void> }
+export interface ToolItem { name: string; scope: ToolScope; priority: number; render(el: HTMLElement, api: ToolApi): void | Promise<void>; unmount?: () => void }
+export interface RegionItem { name: string; slot: RegionSlot; priority: number; render(el: HTMLElement): void | Promise<void>; unmount?: () => void }
 
 const KIND_OF = { page: 'page', bubble: 'bubble', tool: 'tool', region: 'region' } as const
 
