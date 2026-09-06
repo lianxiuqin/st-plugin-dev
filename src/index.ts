@@ -1,4 +1,4 @@
-// agent_plugin_dev/chat-plugin/src/index.ts —— 服务入口:注册 history/input 注入 + /api/chat/* 路由(v2:消费 multiSession)
+// agent_plugin_dev/chat-plugin/src/index.ts —— 纯后端服务:注册 history/input 注入 + /api/chat/* 路由;前端对话页渲染已移交 ui-chat-plugin(v2:消费 multiSession)
 import { Context } from 'cordis'
 import { formatHistoryRows } from './history.ts'
 import { sendMessage, type ChainingLike, type LlmLike, type ChatMessage } from './send.ts'

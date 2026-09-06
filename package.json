@@ -1,12 +1,12 @@
 {
   "name": "chat-plugin",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
-  "description": "前后端一体插件:中央插槽气泡对话页,active 表单完整 prompt + history/input 动态注入,整轮回滚落库 sqlite(cordis v4)",
+  "description": "纯后端插件:/api/chat/* 路由 + history/input prompt 注入,消费 multiSession/prompt/llm;对话页渲染已移交 ui-chat-plugin(cordis v4)",
   "main": "lib/index.js",
   "scripts": {
-    "build": "tsc -p tsconfig.json && node ../../agent_plugin_feat/bootstrap/src/cli/index.ts web-build --cwd .",
+    "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run"
   },
@@ -19,7 +19,6 @@
     "vitest": "^4.1.11"
   },
   "st": {
-    "bundle": { "patch": "./cordis.patch.yml" },
-    "client": { "kind": "web", "path": "lib/index.cjs", "immed": true, "inject": ["ui-polish", "st-ui-slots", "ui-tool-plugin"] }
+    "bundle": { "patch": "./cordis.patch.yml" }
   }
 }
