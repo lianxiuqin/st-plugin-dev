@@ -155,18 +155,24 @@ export function createPanel(toast: ToastFn): HTMLElement {
     if ((isGroup(e) || isPlain(e)) && e.enabled === false) wrap.classList.add('prp-entry-off')
     const head = el('div', 'prp entry-head')
     const handle = el('span', 'prp drag-handle', '⋮⋮')
-    handle.title = '拖动排序(纯前端,点「保存顺序」提交)'
+    handle.title = '拖动排序'
+    const group = isGroup(e)
+    const children = group ? (childrenByParent[e.id] ?? []) : []
+    const isRegParent = group && children.some(isPlaceholder)
+    const role = el('span', 'prp entry-role', isRegParent ? `⛁ ${e.role}` : isGroup(e) ? e.role : isPlain(e) ? e.role : '')
+    // 内容列:名称 + 副文本(demo list-item 标题列)
+    const content = el('div', 'prp entry-content')
     const name = el('span', 'prp entry-name', e.name)
     name.title = e.name
-    const group = isGroup(e)
-    const role = el('span', 'prp entry-role', isGroup(e) ? e.role : isPlain(e) ? e.role : '')
+    content.append(name)
+    if (group) {
+      const sub = el('span', 'prp sub-text', `包含 ${children.length} 个子项`)
+      content.appendChild(sub)
+    }
     const expanded = state.expandedId === e.id
     const caretBtn = button('prp text-btn', '', () => { if (group) void doToggleExpand(e.id) })
     caretBtn.textContent = group ? (expanded ? '收起' : '展开') : ''
     if (!group) caretBtn.style.visibility = 'hidden'
-    const segPid = group
-      ? el('span', 'prp pid', `${(e as GroupEntry).children.length} 子`)
-      : el('span', 'prp pid-empty')
     const spacer = el('span', 'prp entry-spacer')
     const editBtn = button('prp text-btn', '编辑', () => {
       if (group) {
@@ -175,7 +181,6 @@ export function createPanel(toast: ToastFn): HTMLElement {
           onSave: async (input) => {
             if (!input.name) { toast('名称不能为空'); throw new Error('名称不能为空') }
             try {
-              // 注册父(children 含占位符子条)名称由注册方锁定,只允许改 role
               const isRegParent = (childrenByParent[e.id] ?? []).some(isPlaceholder)
               await api.updateEntry(curId(), e.id, isRegParent ? { role: input.role } : { name: input.name, role: input.role })
               await refreshAll(); toast('已保存')
@@ -194,11 +199,11 @@ export function createPanel(toast: ToastFn): HTMLElement {
       }
     })
     const delBtn = button('prp text-btn danger', '删除', () => {
-      const children = group ? (e as GroupEntry).children.length : 0
+      const childCount = group ? (e as GroupEntry).children.length : 0
       confirmDialog({
         title: group ? '删除父条目' : '删除条目',
-        desc: group && children > 0
-          ? `确定要删除父条目「${e.name}」及其 ${children} 个子条目吗?此操作不可撤销。`
+        desc: group && childCount > 0
+          ? `确定要删除父条目「${e.name}」及其 ${childCount} 个子条目吗?此操作不可撤销。`
           : `确定要删除${group ? '父条目' : '条目'}「${e.name}」吗?`,
         onOk: () => { void (async () => {
           try { await api.deleteEntry(curId(), e.id); await refreshAll(); toast('已删除') }
@@ -206,12 +211,17 @@ export function createPanel(toast: ToastFn): HTMLElement {
         })() },
       })
     })
-    // 顶层启用开关(v4):仅顶层条目;关闭整树跳过拼接(子条无开关跟随父)
+    // 启用开关(v4):switch 外观,P2 起包 label.prp.switch(input + slider);change 语义不变
     const toggle = document.createElement('input')
     toggle.type = 'checkbox'
-    toggle.className = 'prp entry-toggle'
+    toggle.className = 'entry-toggle'
     toggle.checked = !((isGroup(e) || isPlain(e)) && e.enabled === false)
-    toggle.title = '启用该条目(关闭后不进入预览/拼接)'
+    toggle.title = '启用'
+    const toggleWrap = document.createElement('label')
+    toggleWrap.className = 'prp switch'
+    const slider = document.createElement('span')
+    slider.className = 'slider'
+    toggleWrap.append(toggle, slider)
     toggle.addEventListener('change', () => {
       void (async () => {
         try {
@@ -221,7 +231,7 @@ export function createPanel(toast: ToastFn): HTMLElement {
         } catch (err) { toastError(err); toggle.checked = !toggle.checked }
       })()
     })
-    head.append(handle, name, role, segPid, caretBtn, spacer, toggle, editBtn, delBtn)
+    head.append(handle, role, content, caretBtn, spacer, toggleWrap, editBtn, delBtn)
     wrap.appendChild(head)
     if (group && expanded) {
       wrap.appendChild(renderDetail(e as GroupEntry, childrenByParent))
@@ -233,7 +243,7 @@ export function createPanel(toast: ToastFn): HTMLElement {
     const children = orderedChildren(g, childrenByParent)
     const detail = el('div', 'prp entry-detail')
     const label = el('label', 'prp detail-label')
-    label.textContent = `子条目(${children.length})—— role 取父条目 ${g.role},text 按序拼入父内容`
+    label.textContent = `子条目 · ${children.length} 项`
     detail.append(label)
     const childList = el('div', 'prp block-list')
     detail.appendChild(childList)
@@ -269,14 +279,13 @@ export function createPanel(toast: ToastFn): HTMLElement {
     const rowEl = el('div', 'prp block-row')
     rowEl.dataset.blockId = c.id
     const handle = el('span', 'prp drag-handle', '⋮⋮')
-    handle.title = '拖动排序(纯前端,点「保存顺序」提交)'
+    handle.title = '拖动排序'
     const name = el('span', 'prp entry-name', c.name)
     if (isPlaceholder(c)) {
-      // 占位符子条:动态注入锚点,只读、可拖动、无编辑/删除
+      // 占位符子条:只读锚点,可拖动,无编辑/删除
       rowEl.classList.add('readonly')
-      const pin = el('span', 'prp child-preview', `⛁ ${c.placeholder!.name}(动态注入)`)
-      const hint = el('span', 'prp child-preview', '由插件注入,不可编辑')
-      rowEl.append(handle, name, pin, hint)
+      const pin = el('span', 'prp child-preview', `⛁ ${c.placeholder!.name}`)
+      rowEl.append(handle, name, pin)
       return rowEl
     }
     const preview = el('span', 'prp child-preview', c.text.trim() === '' ? '(空)' : c.text)
