@@ -1,0 +1,4 @@
+# ui-chat-flat-plugin bundle patch(insert 语法声明条目)
+- insert:
+  - name: ui-chat-flat-plugin
+    id: ui-chat-flat-plugin

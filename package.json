@@ -1,0 +1,34 @@
+{
+  "name": "ui-chat-flat-plugin",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "对话消息扁平化风格(demo):气泡无边框无底色、消息列居中陈列、仅靠左右对齐区分消息来源;经 window.__uiChat__ 注册",
+  "main": "lib/index.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node ../../agent_plugin_feat/bootstrap/src/cli/index.ts web-build --cwd .",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "cordis": "file:../../agent_plugin_feat/vendor/cordis"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.3"
+  },
+  "st": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "kind": "web",
+      "path": "lib/index.cjs",
+      "immed": true,
+      "inject": [
+        "ui-polish",
+        "st-ui-slots",
+        "ui-chat-plugin"
+      ]
+    }
+  }
+}

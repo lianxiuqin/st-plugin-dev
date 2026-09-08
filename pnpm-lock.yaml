@@ -1,0 +1,84 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .:
+    dependencies:
+      cordis:
+        specifier: file:../../agent_plugin_feat/vendor/cordis
+        version: file:../../agent_plugin_feat/vendor/cordis
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.0
+        version: 22.20.1
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+
+packages:
+
+  '@standard-schema/spec@file:../../agent_plugin_feat/vendor/standard-schema':
+    resolution: {directory: ../../agent_plugin_feat/vendor/standard-schema, type: directory}
+
+  '@types/node@22.20.1':
+    resolution: {integrity: sha512-EANqOCF9QFyra+4pfxUcX9STKJpCLjMbObVzljIJomAWSnuSIEAvyzEU53GaajbXJEgdh0iEcPL+DGvpUd4k1Q==}
+
+  argparse@2.0.1:
+    resolution: {integrity: sha512-8+9WqebbFzpX9OR+Wa6O29asIogeRMzcGtAINdpMHHyAg10f05aSFVBbcEqGf/PXw1EjAZ+q2/bEBg3DvurK3Q==}
+
+  cordis@file:../../agent_plugin_feat/vendor/cordis:
+    resolution: {directory: ../../agent_plugin_feat/vendor/cordis, type: directory}
+    hasBin: true
+    peerDependencies:
+      '@cordisjs/plugin-include': ^1.0.4
+      '@cordisjs/plugin-loader': ^1.0.0-rc.5
+    peerDependenciesMeta:
+      '@cordisjs/plugin-include':
+        optional: true
+      '@cordisjs/plugin-loader':
+        optional: true
+
+  cosmokit@file:../../agent_plugin_feat/vendor/cosmokit:
+    resolution: {directory: ../../agent_plugin_feat/vendor/cosmokit, type: directory}
+
+  js-yaml@4.3.2:
+    resolution: {integrity: sha512-SFNOvSJ+Dgf/9An904Yx+CgSlIPCkIpao4qo51lpee25TIRejdH3rhR4EZMGoNx3/TP3O+wzWuiTFl4sqbltzA==}
+    hasBin: true
+
+  typescript@5.9.3:
+    resolution: {integrity: sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw==}
+    engines: {node: '>=14.17'}
+    hasBin: true
+
+  undici-types@6.21.0:
+    resolution: {integrity: sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ==}
+
+snapshots:
+
+  '@standard-schema/spec@file:../../agent_plugin_feat/vendor/standard-schema': {}
+
+  '@types/node@22.20.1':
+    dependencies:
+      undici-types: 6.21.0
+
+  argparse@2.0.1: {}
+
+  cordis@file:../../agent_plugin_feat/vendor/cordis:
+    dependencies:
+      '@standard-schema/spec': file:../../agent_plugin_feat/vendor/standard-schema
+      cosmokit: file:../../agent_plugin_feat/vendor/cosmokit
+      js-yaml: 4.3.2
+
+  cosmokit@file:../../agent_plugin_feat/vendor/cosmokit: {}
+
+  js-yaml@4.3.2:
+    dependencies:
+      argparse: 2.0.1
+
+  typescript@5.9.3: {}
+
+  undici-types@6.21.0: {}
