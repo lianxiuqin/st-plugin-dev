@@ -1,6 +1,6 @@
 {
   "name": "chat-plugin",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "type": "module",
   "description": "纯后端插件:/api/chat/* 路由 + history/input prompt 注入,消费 multiSession/prompt/llm;对话页渲染已移交 ui-chat-plugin(cordis v4)",

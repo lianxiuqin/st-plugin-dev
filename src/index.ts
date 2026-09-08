@@ -1,7 +1,7 @@
 // agent_plugin_dev/chat-plugin/src/index.ts —— 纯后端服务:注册 history/input 注入 + /api/chat/* 路由;前端对话页渲染已移交 ui-chat-plugin(v2:消费 multiSession)
 import { Context } from 'cordis'
 import { formatHistoryRows } from './history.ts'
-import { sendMessage, type ChainingLike, type LlmLike, type ChatMessage } from './send.ts'
+import { sendMessage, streamMessage, type ChainingLike, type LlmLike, type ChatMessage } from './send.ts'
 import { createSessionAdapter, type MultiSessionLike, type SessionLike } from './session.ts'
 import { registerRoutes } from './routes.ts'
 
@@ -13,7 +13,11 @@ declare module 'cordis' {
     multiSession: MultiSessionLike
     promptChaining: ChainingLike
     promptRegister: { register(o: { id: string; name: string; fn: () => string | Promise<string> }): () => void }
-    llmPrompt: { send(messages: ChatMessage[]): Promise<unknown> }
+    llmPrompt: {
+      send(messages: ChatMessage[]): Promise<unknown>
+      stream(messages: ChatMessage[], opts?: { signal?: AbortSignal }): AsyncIterable<string>
+    }
+    chatStreamer: { stream(text: string, opts?: { signal?: AbortSignal }): AsyncIterable<string> }
   }
 }
 
@@ -53,12 +57,16 @@ export function apply(ctx: Context, _config: Record<string, unknown>) {
       session,
       send: (text) => sendMessage({ session, chaining: ctx.promptChaining, llm: ctx.llmPrompt, pending: pendingBox }, text),
     }))
+    disposers.push(ctx.provide('chatStreamer', {
+      stream: (text: string, opts?: { signal?: AbortSignal }) =>
+        streamMessage({ session, chaining: ctx.promptChaining, llm: ctx.llmPrompt, pending: pendingBox }, text, opts),
+    }))
     return () => { for (const d of disposers) d() }
   })
 }
 
 apply.inject = ['webServer', 'multiSession', 'promptChaining', 'promptRegister', 'llmPrompt']
-apply.provide = [] as string[]
+apply.provide = ['chatStreamer'] as string[]
 apply.Config = EmptyConfigSchema
 
 export default apply
