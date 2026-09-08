@@ -3,9 +3,9 @@ import { describe, it, expect, vi } from 'vitest'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { registerRoutes } from '../src/routes.ts'
 
-function capture(streamer: { stream(text: string, opts?: { signal?: AbortSignal }): AsyncIterable<string> }) {
+function capture(streamer: { stream(text: string, opts?: { signal?: AbortSignal }): AsyncIterable<string> }, streamEnabled = true) {
   const handlers = new Map<string, (req: IncomingMessage, res: ServerResponse) => void | Promise<void>>()
-  const dispose = registerRoutes((o) => { handlers.set(o.path, o.handler); return () => handlers.delete(o.path) }, { streamer })
+  const dispose = registerRoutes((o) => { handlers.set(o.path, o.handler); return () => handlers.delete(o.path) }, { streamer, streamEnabled })
   const call = async (path: string, body?: unknown) => {
     const h = handlers.get('/api/chat-stream/')!
     const req = {
@@ -49,6 +49,15 @@ describe('chat-stream routes', () => {
     const r = await c.call('/api/chat-stream/other', {})
     expect(r.status).toBe(404)
     expect(r.text).toContain('接口不存在')
+    c.dispose()
+  })
+  it('streamEnabled=false → 409 stream_disabled,不调用 streamer', async () => {
+    const s = vi.fn(async function* () { yield 'x' })
+    const c = capture({ stream: s }, false)
+    const r = await c.call('/api/chat-stream/send', { text: 'hi' })
+    expect(r.status).toBe(409)
+    expect(r.text).toContain('stream_disabled')
+    expect(s).not.toHaveBeenCalled()
     c.dispose()
   })
 })

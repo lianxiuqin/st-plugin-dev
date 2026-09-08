@@ -16,7 +16,7 @@ function readBody(req: IncomingMessage): Promise<string> {
 
 export interface StreamerLike { stream(text: string, opts?: { signal?: AbortSignal }): AsyncIterable<string> }
 
-export function registerRoutes(register: Register, dep: { streamer: StreamerLike }): () => void {
+export function registerRoutes(register: Register, dep: { streamer: StreamerLike; streamEnabled: boolean }): () => void {
   const disposers: Array<() => void> = []
   disposers.push(register({
     kind: 'prefix', path: PREFIX,
@@ -28,6 +28,12 @@ export function registerRoutes(register: Register, dep: { streamer: StreamerLike
         if (seg.length !== 1 || seg[0] !== 'send' || (req.method ?? 'GET') !== 'POST') {
           res.writeHead(404, { 'content-type': 'application/json; charset=utf-8' })
           res.end(JSON.stringify({ ok: false, message: '接口不存在' }))
+          return
+        }
+        if (!dep.streamEnabled) {
+          // stream:false:不流式;前端 transport 收到 code=stream_disabled 后回退整回 /api/chat/send
+          res.writeHead(409, { 'content-type': 'application/json; charset=utf-8' })
+          res.end(JSON.stringify({ ok: false, code: 'stream_disabled', message: '流式输出已关闭(stream:false),已回退整回' }))
           return
         }
         const raw = await readBody(req)

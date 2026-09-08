@@ -16,6 +16,18 @@ function configStreamOn(): boolean {
   return mine ? mine.stream !== false : true // 未配置 → 默认开
 }
 
+async function sendWhole(text: string): Promise<string> {
+  const res = await fetch('/api/chat/send', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ text }),
+  })
+  let body: { ok?: boolean; message?: string; data?: { reply?: string } } | null = null
+  try { body = (await res.json()) as { ok?: boolean; message?: string; data?: { reply?: string } } } catch { /* 非 JSON */ }
+  if (!res.ok || !body?.ok) throw new Error(body?.message || `HTTP ${res.status}`)
+  return (body.data?.reply ?? '')
+}
+
 async function sendStreamText(text: string, hooks: { onDelta?(d: string): void }): Promise<string> {
   const res = await fetch('/api/chat-stream/send', {
     method: 'POST',
@@ -23,9 +35,11 @@ async function sendStreamText(text: string, hooks: { onDelta?(d: string): void }
     body: JSON.stringify({ text }),
   })
   if (!res.ok || !res.body) {
-    let message = `HTTP ${res.status}`
-    try { const b = await res.json() as { message?: string }; if (b?.message) message = b.message } catch { /* 非 JSON */ }
-    throw new Error(message)
+    let body: { code?: string; message?: string } | null = null
+    try { body = (await res.json()) as { code?: string; message?: string } } catch { /* 非 JSON */ }
+    // 流式被关闭(后端 stream:false)或后端无此路由(旧版/未生效):回退整回,不报 404
+    if (body?.code === 'stream_disabled' || res.status === 404) return sendWhole(text)
+    throw new Error(body?.message || `HTTP ${res.status}`)
   }
   const reader = res.body.getReader()
   const decoder = new TextDecoder()

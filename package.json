@@ -1,6 +1,6 @@
 {
   "name": "chat-stream-plugin",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
   "description": "对话流式输出(打字机):后端 POST /api/chat-stream/send 转发 chat-plugin 的 chatStreamer 为 SSE;前端向 ui-chat-plugin 注册 stream transport;config.stream 可关回整回",
