@@ -14,7 +14,8 @@ function readBody(req: IncomingMessage): Promise<string> {
   })
 }
 
-export interface StreamerLike { stream(text: string, opts?: { signal?: AbortSignal }): AsyncIterable<string> }
+export type StreamDelta = { r: string } | { t: string }
+export interface StreamerLike { stream(text: string, opts?: { signal?: AbortSignal }): AsyncIterable<StreamDelta> }
 
 export function registerRoutes(register: Register, dep: { streamer: StreamerLike; streamEnabled: boolean }): () => void {
   const disposers: Array<() => void> = []
@@ -45,7 +46,8 @@ export function registerRoutes(register: Register, dep: { streamer: StreamerLike
         try {
           for await (const d of dep.streamer.stream(text, { signal: ac.signal })) {
             if (res.writableEnded) return
-            res.write(`data: ${JSON.stringify({ t: 'delta', d })}\n\n`)
+            const ev = 'r' in d ? { t: 'r', d: d.r } : { t: 'delta', d: d.t }
+            res.write(`data: ${JSON.stringify(ev)}\n\n`)
           }
           if (!res.writableEnded) res.write('data: {"t":"done"}\n\n')
         } catch (e) {
