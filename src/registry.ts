@@ -18,7 +18,7 @@ export interface BubbleItem {
 }
 export interface ToolItem { name: string; scope: ToolScope; priority: number; render(el: HTMLElement, api: ToolApi): void | Promise<void>; unmount?: () => void }
 export interface RegionItem { name: string; slot: RegionSlot; priority: number; render(el: HTMLElement): void | Promise<void>; unmount?: () => void }
-export interface TransportHooks { onDelta?(delta: string): void }
+export interface TransportHooks { onDelta?(delta: string): void; onReasoning?(chunk: string): void }
 export interface TransportItem {
   name: string
   priority: number

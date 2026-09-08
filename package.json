@@ -1,6 +1,6 @@
 {
   "name": "ui-chat-plugin",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "private": true,
   "type": "module",
   "description": "对话页渲染插件:默认气泡对话页 + window.__uiChat__ 分层扩展注册表(页面所有内容可被第三方插件替换/扩展)",

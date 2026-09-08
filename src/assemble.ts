@@ -1,5 +1,5 @@
 // agent_plugin_dev/ui-chat-plugin/src/assemble.ts —— 默认页装配:扩展点 → 内容;错误隔离回退默认
-import type { ChatRegistry, ChatMessage, BubbleApi, ToolApi, TransportItem } from './registry.ts'
+import type { ChatRegistry, ChatMessage, BubbleApi, ToolApi, TransportItem, TransportHooks } from './registry.ts'
 import { renderDefaultBubble } from './default/bubble.ts'
 import type * as api from './ui/api.ts'
 
@@ -143,16 +143,20 @@ export function createDefaultPanel(reg: ChatRegistry, deps: PanelDeps): PanelHan
     list.appendChild(row)
   }
 
+  async function reloadChrome(): Promise<void> {
+    renderHeadTools()
+    renderRegions(headRegionsBox, 'page-head')
+    renderRegions(sideBox, 'side')
+    sideBox.style.display = reg.regionsOf('side').length > 0 ? '' : 'none'
+    renderComposerTools()
+    renderRegions(composerTopBox, 'composer-top')
+  }
+
   async function reload(): Promise<void> {
     if (disposed || reloading) { if (reloading) return reloading; return }
     const taValue = ta.value
     reloading = (async () => {
-      renderHeadTools()
-      renderRegions(headRegionsBox, 'page-head')
-      renderRegions(sideBox, 'side')
-      sideBox.style.display = reg.regionsOf('side').length > 0 ? '' : 'none'
-      renderComposerTools()
-      renderRegions(composerTopBox, 'composer-top')
+      await reloadChrome()
       try {
         const active = await deps.getActive()
         if (!active) { appendEmpty('点击右侧 ＋ 新建会话'); return }
@@ -171,9 +175,21 @@ export function createDefaultPanel(reg: ChatRegistry, deps: PanelDeps): PanelHan
   }
 
   // 默认 transport = 整回 fetch(/api/chat/send),与未引入扩展时行为一致;第三方注册更高 priority 且 match 命中的 transport 时被覆盖
+  // 整回响应 data.reasoning 存在时一次性回调 onReasoning(宿主据此渲染链块并走保留路径)
   const defaultFetchTransport: TransportItem = {
     name: 'fetch', priority: 0, match: () => true,
-    send: (text: string) => deps.send(text),
+    send: async (text: string, hooks?: TransportHooks) => {
+      const res = await fetch('/api/chat/send', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ text }),
+      })
+      let body: { ok?: boolean; message?: string; data?: { reply?: string; reasoning?: string | null } } | null = null
+      try { body = (await res.json()) as { ok?: boolean; message?: string; data?: { reply?: string; reasoning?: string | null } } } catch { /* 非 JSON */ }
+      if (!res.ok || !body?.ok) throw new Error(body?.message || `HTTP ${res.status}`)
+      if (typeof body.data?.reasoning === 'string' && body.data.reasoning !== '') hooks?.onReasoning?.(body.data.reasoning)
+      return body.data?.reply ?? ''
+    },
   }
 
   function doSend(): void {
@@ -191,9 +207,45 @@ export function createDefaultPanel(reg: ChatRegistry, deps: PanelDeps): PanelHan
     sendBtn.textContent = '发送中…'
     const transport = reg.pickTransport(text.trim()) ?? defaultFetchTransport
     let deltaRow: HTMLElement | null = null
+    let chainBox: HTMLElement | null = null
+    let sawReasoning = false
+    let reasoningDone = false
+
+    // 链块:思考中(虚线+实时追加)→ 正文首字或完成时自动收起为一行,可点击展开全文
+    const finishChain = (): void => {
+      if (!chainBox || reasoningDone) return
+      reasoningDone = true
+      chainBox.classList.remove('thinking')
+      chainBox.classList.remove('open')
+      const st = chainBox.querySelector('.uchat-chain-state')
+      if (st) st.textContent = '已收起 · 点击展开全文'
+    }
+    const ensureChainBox = (): HTMLElement => {
+      if (chainBox) return chainBox
+      if (!deltaRow) {
+        deltaRow = h('div', 'uchat-row ai')
+        list.appendChild(deltaRow)
+      }
+      const chain = h('div', 'uchat-chain thinking')
+      const head = h('div', 'uchat-chain-head')
+      head.append(h('span', 'uchat-chain-caret'))
+      head.append(h('span', 'uchat-chain-label', '思考过程'))
+      const state = h('span', 'uchat-chain-state', '思考中…')
+      head.append(state)
+      const body = h('div', 'uchat-chain-body')
+      chain.append(head, body)
+      head.addEventListener('click', () => chain.classList.toggle('open'))
+      const boxEl = h('div', 'uchat-bubble-box')
+      renderDefaultBubble(boxEl, { id: 0, role: 'ai', content: '', createdAt: '' })
+      deltaRow.insertBefore(chain, deltaRow.firstChild)
+      deltaRow.appendChild(boxEl)
+      scrollBottom()
+      chainBox = chain
+      return chain
+    }
     // 首个 onDelta 时懒插入 assistant 占位(整回 transport 不触发 → 零闪现);send resolve 后 reload() 重绘统一 DOM
     const ensureDeltaBox = (): HTMLElement => {
-      if (deltaRow) return deltaRow
+      if (deltaRow) return deltaRow.querySelector('.uchat-bubble-box') as HTMLElement
       deltaRow = h('div', 'uchat-row ai')
       const boxEl = h('div', 'uchat-bubble-box')
       renderDefaultBubble(boxEl, { id: 0, role: 'ai', content: '', createdAt: '' })
@@ -202,17 +254,34 @@ export function createDefaultPanel(reg: ChatRegistry, deps: PanelDeps): PanelHan
       scrollBottom()
       return boxEl
     }
-    Promise.resolve(transport.send(text.trim(), {
+    const sendPromise = Promise.resolve(transport.send(text.trim(), {
       onDelta(delta: string) {
         if (!delta) return
+        if (chainBox && !reasoningDone) finishChain() // 正文首字 → 链自动收起
         const target = ensureDeltaBox()
         target.textContent = (target.textContent ?? '') + delta
         scrollBottom()
       },
+      onReasoning(chunk: string) {
+        if (!chunk) return
+        sawReasoning = true
+        const box = ensureChainBox()
+        const body = box.querySelector('.uchat-chain-body') as HTMLElement
+        body.textContent = (body.textContent ?? '') + chunk
+        scrollBottom()
+      },
     }))
+    sendPromise
       .then(async () => {
-        await reload()
-        deps.onSessionChanged?.('message-appended')
+        if (sawReasoning && chainBox) {
+          // 保留路径:链不落库,整表 reload 会用历史重绘清掉即时行 → 只刷 chrome 不重绘列表
+          finishChain()
+          await reloadChrome()
+          deps.onSessionChanged?.('message-appended')
+        } else {
+          await reload()
+          deps.onSessionChanged?.('message-appended')
+        }
       })
       .catch((e: unknown) => {
         appendErrorRow((e as Error).message || '发送失败')
@@ -220,6 +289,7 @@ export function createDefaultPanel(reg: ChatRegistry, deps: PanelDeps): PanelHan
       .finally(() => {
         sending = false
         deltaRow = null
+        chainBox = null
         sendBtn.disabled = false
         sendBtn.textContent = '发送'
         ta.focus()
