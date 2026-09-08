@@ -84,3 +84,31 @@ describe('ChatRegistry', () => {
     expect(r.counts().bubble).toBe(0)
   })
 })
+
+const transport = (name: string, priority = 0, match = () => true) => ({
+  name, priority,
+  match: vi.fn((_text: string) => match()),
+  send: vi.fn((_text: string) => 'ok'),
+})
+
+describe('ChatRegistry transport', () => {
+  it('registerTransport:同名覆盖 + priority/match 命中 + 反注册', () => {
+    const r = new ChatRegistry()
+    const oldUn = vi.fn()
+    r.registerTransport({ ...transport('t'), unmount: oldUn })
+    r.registerTransport(transport('t', 5))
+    expect(r.counts().transport).toBe(1)
+    expect(oldUn).toHaveBeenCalledTimes(1)
+    expect(r.pickTransport('hi')?.name).toBe('t')
+    r.registerTransport(transport('no', 10, () => false))
+    expect(r.pickTransport('hi')?.name).toBe('t')
+    r.unregister('transport', 't')
+    expect(r.pickTransport('hi')).toBeNull()
+    expect(r.counts().transport).toBe(1) // 剩 no(不 match)
+  })
+  it('非法 transport 注册 throw', () => {
+    const r = new ChatRegistry()
+    expect(() => r.registerTransport({ name: '', match: () => true, send: (_t: string) => 'x' })).toThrow('非法 transport')
+    expect(() => r.registerTransport({ name: 'a', match: 1 as never, send: (_t: string) => 'x' })).toThrow('非法 transport')
+  })
+})

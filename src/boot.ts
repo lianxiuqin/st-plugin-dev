@@ -11,6 +11,7 @@ export function mountChatPlugin(): { dispose(): void } {
     registerBubble: (o: Parameters<ChatRegistry['registerBubble']>[0]) => reg.registerBubble(o),
     registerTool: (o: Parameters<ChatRegistry['registerTool']>[0]) => reg.registerTool(o),
     registerRegion: (o: Parameters<ChatRegistry['registerRegion']>[0]) => reg.registerRegion(o),
+    registerTransport: (o: Parameters<ChatRegistry['registerTransport']>[0]) => reg.registerTransport(o),
     unregister: (kind: Parameters<ChatRegistry['unregister']>[0], name: string) => reg.unregister(kind, name),
     subscribe: (fn: () => void) => reg.subscribe(fn),
     setDefault: (kind: 'page' | 'bubble', enabled: boolean) => reg.setDefault(kind, enabled),

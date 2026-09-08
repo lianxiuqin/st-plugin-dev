@@ -1,5 +1,5 @@
 // agent_plugin_dev/ui-chat-plugin/src/assemble.ts —— 默认页装配:扩展点 → 内容;错误隔离回退默认
-import type { ChatRegistry, ChatMessage, BubbleApi, ToolApi } from './registry.ts'
+import type { ChatRegistry, ChatMessage, BubbleApi, ToolApi, TransportItem } from './registry.ts'
 import { renderDefaultBubble } from './default/bubble.ts'
 import type * as api from './ui/api.ts'
 
@@ -170,6 +170,12 @@ export function createDefaultPanel(reg: ChatRegistry, deps: PanelDeps): PanelHan
     try { await reloading } finally { reloading = null }
   }
 
+  // 默认 transport = 整回 fetch(/api/chat/send),与未引入扩展时行为一致;第三方注册更高 priority 且 match 命中的 transport 时被覆盖
+  const defaultFetchTransport: TransportItem = {
+    name: 'fetch', priority: 0, match: () => true,
+    send: (text: string) => deps.send(text),
+  }
+
   function doSend(): void {
     if (sending) return
     const text = ta.value
@@ -183,7 +189,27 @@ export function createDefaultPanel(reg: ChatRegistry, deps: PanelDeps): PanelHan
     sending = true
     sendBtn.disabled = true
     sendBtn.textContent = '发送中…'
-    deps.send(text.trim())
+    const transport = reg.pickTransport(text.trim()) ?? defaultFetchTransport
+    let deltaRow: HTMLElement | null = null
+    // 首个 onDelta 时懒插入 assistant 占位(整回 transport 不触发 → 零闪现);send resolve 后 reload() 重绘统一 DOM
+    const ensureDeltaBox = (): HTMLElement => {
+      if (deltaRow) return deltaRow
+      deltaRow = h('div', 'uchat-row ai')
+      const boxEl = h('div', 'uchat-bubble-box')
+      renderDefaultBubble(boxEl, { id: 0, role: 'ai', content: '', createdAt: '' })
+      deltaRow.appendChild(boxEl)
+      list.appendChild(deltaRow)
+      scrollBottom()
+      return boxEl
+    }
+    Promise.resolve(transport.send(text.trim(), {
+      onDelta(delta: string) {
+        if (!delta) return
+        const target = ensureDeltaBox()
+        target.textContent = (target.textContent ?? '') + delta
+        scrollBottom()
+      },
+    }))
       .then(async () => {
         await reload()
         deps.onSessionChanged?.('message-appended')
@@ -193,6 +219,7 @@ export function createDefaultPanel(reg: ChatRegistry, deps: PanelDeps): PanelHan
       })
       .finally(() => {
         sending = false
+        deltaRow = null
         sendBtn.disabled = false
         sendBtn.textContent = '发送'
         ta.focus()
