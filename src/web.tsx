@@ -23,11 +23,11 @@ const flatStyle = (): void => {
   // 注:本 style 由 flat 插件 mount 时注入,可能先于 ui-chat-plugin 默认样式;
   // 覆盖一律提高特异性(body 前缀)或加 !important,避免同特异度时被后注入的默认样式压过。
   s.textContent = `
-/* 1) 中央固定宽度对话列:标题/消息/输入同列 800px 居中(参照 demo:max-width 800 布局) */
+/* 1) 中央对话列:占内容区 80% 居中(左右各留白 10%);标题/消息/输入同列 */
 body .uchat-page { align-items: center; }
 body .uchat-page > .uchat-head,
 body .uchat-page > .uchat-body,
-body .uchat-page > .uchat-composer { width: min(800px, 100%); box-sizing: border-box; }
+body .uchat-page > .uchat-composer { width: 80%; box-sizing: border-box; }
 body .uchat-page .uchat-body .uchat-list { padding: 24px 20px; gap: 20px; }
 /* 2) 默认气泡壳(发送中的即时行等)强制透明无框无底;宽度同样放开为占满框架 */
 .uchat-page .uchat-list > .uchat-row .uchat-bubble { background: transparent !important; color: var(--ui-text, #444) !important; border-radius: 0 !important; padding: 0 !important; box-shadow: none !important; max-width: 100% !important; font-size: 15px; line-height: 1.7; }
