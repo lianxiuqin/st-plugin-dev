@@ -5,7 +5,7 @@ interface UiChatLike {
   registerTransport(o: {
     name: string; priority?: number
     match(text: string): boolean
-    send(text: string, hooks: { onDelta?(d: string): void }): string | Promise<string>
+    send(text: string, hooks: { onDelta?(d: string): void; onReasoning?(r: string): void }): string | Promise<string>
   }): void
   unregister(kind: string, name: string): void
 }
@@ -16,19 +16,21 @@ function configStreamOn(): boolean {
   return mine ? mine.stream !== false : true // 未配置 → 默认开
 }
 
-async function sendWhole(text: string): Promise<string> {
+async function sendWhole(text: string, hooks: { onDelta?(d: string): void; onReasoning?(r: string): void }): Promise<string> {
   const res = await fetch('/api/chat/send', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ text }),
   })
-  let body: { ok?: boolean; message?: string; data?: { reply?: string } } | null = null
-  try { body = (await res.json()) as { ok?: boolean; message?: string; data?: { reply?: string } } } catch { /* 非 JSON */ }
+  let body: { ok?: boolean; message?: string; data?: { reply?: string; reasoning?: string | null } } | null = null
+  try { body = (await res.json()) as { ok?: boolean; message?: string; data?: { reply?: string; reasoning?: string | null } } } catch { /* 非 JSON */ }
   if (!res.ok || !body?.ok) throw new Error(body?.message || `HTTP ${res.status}`)
+  // 整回携带思维链时一次性回调,宿主据此渲染链折叠块(走保留路径)
+  if (typeof body.data?.reasoning === 'string' && body.data.reasoning !== '') hooks?.onReasoning?.(body.data.reasoning)
   return (body.data?.reply ?? '')
 }
 
-async function sendStreamText(text: string, hooks: { onDelta?(d: string): void }): Promise<string> {
+async function sendStreamText(text: string, hooks: { onDelta?(d: string): void; onReasoning?(r: string): void }): Promise<string> {
   const res = await fetch('/api/chat-stream/send', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -38,7 +40,7 @@ async function sendStreamText(text: string, hooks: { onDelta?(d: string): void }
     let body: { code?: string; message?: string } | null = null
     try { body = (await res.json()) as { code?: string; message?: string } } catch { /* 非 JSON */ }
     // 流式被关闭(后端 stream:false)或后端无此路由(旧版/未生效):回退整回,不报 404
-    if (body?.code === 'stream_disabled' || res.status === 404) return sendWhole(text)
+    if (body?.code === 'stream_disabled' || res.status === 404) return sendWhole(text, hooks)
     throw new Error(body?.message || `HTTP ${res.status}`)
   }
   const reader = res.body.getReader()
@@ -55,7 +57,8 @@ async function sendStreamText(text: string, hooks: { onDelta?(d: string): void }
       buf = buf.slice(idx + 1)
       const ev = parseSseLine(line)
       if (!ev) continue
-      if (ev.t === 'delta' && ev.d) { reply += ev.d; hooks.onDelta?.(ev.d) }
+      if (ev.t === 'r' && ev.d) hooks.onReasoning?.(ev.d)
+      else if (ev.t === 'delta' && ev.d) { reply += ev.d; hooks.onDelta?.(ev.d) }
       else if (ev.t === 'error') throw new Error(ev.message ?? '流式请求失败')
       else if (ev.t === 'done') return reply
     }
