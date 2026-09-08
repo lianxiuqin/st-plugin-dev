@@ -65,4 +65,39 @@ describe('llmPrompt service', () => {
     const svc = createLlmPromptService({ db, cred: fakeCred, fetchImpl })
     await expect(svc.send([{ role: 'user', content: 'x' }])).rejects.toThrow('请求超时')
   })
+  it('stream:messages 非法/无 active/无密钥 校验与 send 一致', async () => {
+    await fakeCred.delete('llm:1') // 清早先用例(HTTP 非 2xx 等)写入 llm:1 的残留,保证无密钥分支可测
+    const svc = createLlmPromptService({ db, cred: fakeCred })
+    const g1 = svc.stream([])
+    await expect(g1.next()).rejects.toThrow('messages')
+    createPreset(db, { presetName: 'a', format: 'openai_compatible', vendor: '', baseUrl: 'api.x.com/v1', model: 'm', timeout: 30 })
+    setActivePresetId(db, 1)
+    const g2 = svc.stream([{ role: 'user', content: 'x' }])
+    await expect(g2.next()).rejects.toThrow('密钥')
+    await fakeCred.set('llm:1', 'k')
+  })
+  it('stream:HTTP 非 2xx 包装为中文失败', async () => {
+    createPreset(db, { presetName: 'a', format: 'openai_compatible', vendor: '', baseUrl: 'api.x.com/v1', model: 'm', timeout: 30 })
+    setActivePresetId(db, 1)
+    await fakeCred.set('llm:1', 'k')
+    const fetchImpl = (async () => new Response('err', { status: 500 })) as unknown as typeof fetch
+    const svc = createLlmPromptService({ db, cred: fakeCred, fetchImpl })
+    const g = svc.stream([{ role: 'user', content: 'hi' }])
+    await expect(g.next()).rejects.toThrow('请求失败: HTTP 500')
+  })
+  it('stream:成功逐块产出增量文本', async () => {
+    createPreset(db, { presetName: 'a', format: 'openai_compatible', vendor: '', baseUrl: 'api.x.com/v1', model: 'm', timeout: 30 })
+    setActivePresetId(db, 1)
+    await fakeCred.set('llm:1', 'k')
+    const body = new ReadableStream<Uint8Array>({ start(c) {
+      const enc = new TextEncoder()
+      c.enqueue(enc.encode('data: {"choices":[{"delta":{"content":"你"}}]}\ndata: {"choices":[{"delta":{"content":"好"}}]}\n'))
+      c.close()
+    } })
+    const fetchImpl = (async () => new Response(body, { status: 200 })) as unknown as typeof fetch
+    const svc = createLlmPromptService({ db, cred: fakeCred, fetchImpl })
+    const got: string[] = []
+    for await (const d of svc.stream([{ role: 'user', content: 'hi' }])) got.push(d)
+    expect(got).toEqual(['你', '好'])
+  })
 })

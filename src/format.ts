@@ -135,3 +135,88 @@ export async function sendChat(
     body: JSON.stringify({ model: opts.model, messages: opts.messages }),
   }, timeout, fetchImpl)
 }
+
+// —— 流式:SSE 增量解析(三厂商)+ 增量请求 ——
+
+/** 解析单行 SSE(data: {...});无增量(空/事件行/非目标结构)返回 null */
+export function parseDeltaLine(format: string, line: string): string | null {
+  const s = typeof line === 'string' ? line.trim() : ''
+  if (!s.startsWith('data:')) return null
+  const payload = s.slice(5).trim()
+  if (!payload || payload === '[DONE]') return null
+  let j: Record<string, unknown>
+  try { j = JSON.parse(payload) as Record<string, unknown> } catch { return null }
+  if (format === 'anthropic') {
+    if (j.type !== 'content_block_delta') return null
+    const delta = j.delta as { type?: string; text?: string } | undefined
+    if (delta?.type !== 'text_delta' || typeof delta.text !== 'string' || delta.text === '') return null
+    return delta.text
+  }
+  if (format === 'google') {
+    const cands = j.candidates as Array<{ content?: { parts?: Array<{ text?: unknown }> } }> | undefined
+    const parts = cands?.[0]?.content?.parts
+    if (!Array.isArray(parts) || parts.length === 0) return null
+    const text = parts.map((p) => (p && typeof p.text === 'string' ? p.text : '')).join('')
+    return text === '' ? null : text
+  }
+  const choices = j.choices as Array<{ delta?: { content?: unknown } }> | undefined
+  const content = choices?.[0]?.delta?.content
+  return typeof content === 'string' && content !== '' ? content : null
+}
+
+/**
+ * 流式聊天请求:async generator,逐块产出增量文本。
+ * signal 由调用方传入(req close / 用户停止);abort 时 reader.read() 抛 AbortError 上抛。
+ * 非 2xx 抛 `HTTP <status>`(由 service 包装成中文)。
+ */
+export async function* sendChatStream(
+  format: string,
+  opts: { baseUrl: string; key: string; model: string; messages: ChatMessage[] },
+  _timeout: number,
+  signal: AbortSignal | undefined,
+  fetchImpl: typeof fetch = fetch,
+): AsyncGenerator<string> {
+  const base = withProtocol(normalizeBase(opts.baseUrl))
+  if (opts.messages.length === 0) throw new Error('messages 不能为空')
+  let url: string
+  let headers: Record<string, string>
+  let body: string
+  if (format === 'anthropic') {
+    url = `${base}/messages`
+    headers = { 'x-api-key': opts.key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' }
+    // max_tokens 与现有 sendChat 保持一致(历史值,非本次范围)
+    body = JSON.stringify({ model: opts.model, max_tokens: 8, stream: true, messages: opts.messages })
+  } else if (format === 'google') {
+    const contents = opts.messages.map((m) => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] }))
+    url = `${base}/models/${encodeURIComponent(opts.model)}:streamGenerateContent?alt=sse&key=${encodeURIComponent(opts.key)}`
+    headers = { 'content-type': 'application/json' }
+    body = JSON.stringify({ contents })
+  } else {
+    url = `${base}/chat/completions`
+    headers = { Authorization: `Bearer ${opts.key}`, 'content-type': 'application/json' }
+    body = JSON.stringify({ model: opts.model, messages: opts.messages, stream: true })
+  }
+  const res = await fetchImpl(url, { method: 'POST', headers, body, signal })
+  if (res.status < 200 || res.status >= 300) throw new Error(`HTTP ${res.status}`)
+  const reader = res.body?.getReader()
+  if (!reader) throw new Error('无响应流')
+  const decoder = new TextDecoder()
+  let buf = ''
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) {
+      // EOF flush:末行可能无 \n 结尾(测试/部分实现边界)
+      const delta = parseDeltaLine(format, buf)
+      if (delta) yield delta
+      break
+    }
+    buf += decoder.decode(value, { stream: true })
+    let idx: number
+    while ((idx = buf.indexOf('\n')) >= 0) {
+      const line = buf.slice(0, idx)
+      buf = buf.slice(idx + 1)
+      const delta = parseDeltaLine(format, line)
+      if (delta) yield delta
+    }
+  }
+}
