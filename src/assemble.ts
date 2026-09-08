@@ -206,6 +206,13 @@ export function createDefaultPanel(reg: ChatRegistry, deps: PanelDeps): PanelHan
   ;(toolApi as { reload(): void }).reload = () => { void reload() }
 
   const unsub = reg.subscribe(() => { void reload() })
+  // 右侧会话栏切换/删除会话(st:session-changed)联动:主面板跟随重载,
+  // 否则需手动刷新页面才能看到其它会话(旧 chat-plugin web.tsx 的联动在解耦时遗漏,此处补回)
+  const onSessionChanged = (e: Event): void => {
+    const reason = (e as CustomEvent<{ reason?: string }>).detail?.reason
+    if (shouldReloadOnSessionChange(reason)) void reload()
+  }
+  window.addEventListener('st:session-changed', onSessionChanged)
   void reload()
 
   return {
@@ -214,9 +221,17 @@ export function createDefaultPanel(reg: ChatRegistry, deps: PanelDeps): PanelHan
     dispose() {
       disposed = true
       unsub()
+      window.removeEventListener('st:session-changed', onSessionChanged)
       root.remove()
     },
   }
+}
+
+/** 纯决策:会话切换/删除事件(st:session-changed)是否应触发主面板重载;
+ * 与旧 chat-plugin 前端行为一致 —— 仅 active-changed(切换/新建)/deleted 才重载,
+ * message-appended 由发送方自行 reload 后派发,不再重复重载 */
+export function shouldReloadOnSessionChange(reason: unknown): boolean {
+  return reason === 'active-changed' || reason === 'deleted'
 }
 
 /** 纯决策:单条消息行由谁渲染(default/custom/skip)——供测试与装配复用 */
