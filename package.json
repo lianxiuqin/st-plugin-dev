@@ -1,6 +1,6 @@
 {
   "name": "ui-chat-flat-plugin",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "type": "module",
   "description": "对话消息扁平化风格(demo):气泡无边框无底色、消息列居中陈列、仅靠左右对齐区分消息来源;经 window.__uiChat__ 注册",

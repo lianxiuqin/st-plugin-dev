@@ -23,16 +23,20 @@ const flatStyle = (): void => {
   // 注:本 style 由 flat 插件 mount 时注入,可能先于 ui-chat-plugin 默认样式;
   // 覆盖一律提高特异性(body 前缀)或加 !important,避免同特异度时被后注入的默认样式压过。
   s.textContent = `
-/* 1) 整页对话列收窄居中:标题 / 消息 / 输入区同一条居中的对话列,左右留白对称 */
+/* 1) 中央固定宽度对话列:标题/消息/输入同列 800px 居中(参照 demo:max-width 800 布局) */
 body .uchat-page { align-items: center; }
 body .uchat-page > .uchat-head,
 body .uchat-page > .uchat-body,
-body .uchat-page > .uchat-composer { width: min(720px, 100%); box-sizing: border-box; }
-body .uchat-page .uchat-body .uchat-list { padding: 30px 16px; gap: 24px; }
-/* 2) 默认气泡壳(发送中的即时行等)强制透明无框无底,与历史消息一致、不闪深色块 */
-.uchat-page .uchat-list > .uchat-row .uchat-bubble { background: transparent !important; color: var(--ui-text, #444) !important; border-radius: 0 !important; padding: 0 !important; box-shadow: none !important; font-size: 14px; line-height: 1.8; }
-/* 3) 扁平气泡:纯文本无任何容器视觉,左右位置由 .uchat-row.ai/.user 对齐决定 */
-.uchat-flat-msg { max-width: 78%; padding: 0; white-space: pre-wrap; word-break: break-word; font-size: 14px; line-height: 1.8; color: var(--ui-text, #444); }
+body .uchat-page > .uchat-composer { width: min(800px, 100%); box-sizing: border-box; }
+body .uchat-page .uchat-body .uchat-list { padding: 24px 20px; gap: 20px; }
+/* 2) 默认气泡壳(发送中的即时行等)强制透明无框无底;宽度同样放开为占满框架 */
+.uchat-page .uchat-list > .uchat-row .uchat-bubble { background: transparent !important; color: var(--ui-text, #444) !important; border-radius: 0 !important; padding: 0 !important; box-shadow: none !important; max-width: 100% !important; font-size: 15px; line-height: 1.7; }
+.uchat-page .uchat-list > .uchat-row.user .uchat-bubble { text-align: right; }
+/* 3) 扁平消息:宽度由内容撑开但可占满整个框架(max-width 100%);短文本自适应,
+     长文本占满整行。无气泡壳,来源靠行位置 + 块内文本方向区分:AI 左对齐 / user 右对齐 */
+.uchat-flat-msg { max-width: 100%; padding: 0; white-space: pre-wrap; word-break: break-word; font-size: 15px; line-height: 1.7; color: var(--ui-text, #444); }
+.uchat-row.ai .uchat-flat-msg { text-align: left; }
+.uchat-row.user .uchat-flat-msg { text-align: right; }
 `
   document.head.appendChild(s)
 }
