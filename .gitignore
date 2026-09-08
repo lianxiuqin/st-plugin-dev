@@ -1,0 +1,12 @@
+*
+!*/
+!/src/
+!/src/**
+!/lib/
+!/lib/**
+!/package.json
+!/pnpm-lock.yaml
+!/pnpm-workspace.yaml
+!/tsconfig.json
+!/cordis.patch.yml
+!/.gitignore

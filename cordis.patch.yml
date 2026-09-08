@@ -1,0 +1,4 @@
+# ui-chat-thinking-plugin bundle patch(insert 语法声明条目)
+- insert:
+  - name: ui-chat-thinking-plugin
+    id: ui-chat-thinking-plugin
