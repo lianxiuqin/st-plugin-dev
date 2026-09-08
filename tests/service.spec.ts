@@ -96,8 +96,8 @@ describe('llmPrompt service', () => {
     } })
     const fetchImpl = (async () => new Response(body, { status: 200 })) as unknown as typeof fetch
     const svc = createLlmPromptService({ db, cred: fakeCred, fetchImpl })
-    const got: string[] = []
+    const got: Array<{ r?: string; t?: string }> = []
     for await (const d of svc.stream([{ role: 'user', content: 'hi' }])) got.push(d)
-    expect(got).toEqual(['你', '好'])
+    expect(got).toEqual([{ t: '你' }, { t: '好' }])
   })
 })

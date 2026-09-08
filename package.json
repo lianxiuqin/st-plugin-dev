@@ -1,6 +1,6 @@
 {
   "name": "llm-plugin",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "type": "module",
   "description": "前后端一体插件:多预设 AI 厂商 API 配置 + 真实测试连通(cordis v4)",

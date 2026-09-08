@@ -138,8 +138,17 @@ export async function sendChat(
 
 // —— 流式:SSE 增量解析(三厂商)+ 增量请求 ——
 
-/** 解析单行 SSE(data: {...});无增量(空/事件行/非目标结构)返回 null */
-export function parseDeltaLine(format: string, line: string): string | null {
+/** 流式增量:r=思维链(reasoning),t=正文(text)。无增量(空/事件行/非目标结构)返回 null */
+export type Delta = { r: string } | { t: string }
+
+function pickPart(parts: Array<{ text?: unknown; thought?: unknown }>, thought: boolean): string {
+  return parts
+    .filter((p) => (thought ? p.thought === true : p.thought !== true))
+    .map((p) => (p && typeof p.text === 'string' ? p.text : ''))
+    .join('')
+}
+
+export function parseDeltaLine(format: string, line: string): Delta | null {
   const s = typeof line === 'string' ? line.trim() : ''
   if (!s.startsWith('data:')) return null
   const payload = s.slice(5).trim()
@@ -148,20 +157,27 @@ export function parseDeltaLine(format: string, line: string): string | null {
   try { j = JSON.parse(payload) as Record<string, unknown> } catch { return null }
   if (format === 'anthropic') {
     if (j.type !== 'content_block_delta') return null
-    const delta = j.delta as { type?: string; text?: string } | undefined
-    if (delta?.type !== 'text_delta' || typeof delta.text !== 'string' || delta.text === '') return null
-    return delta.text
+    const delta = j.delta as { type?: string; text?: string; thinking?: string } | undefined
+    if (delta?.type === 'thinking_delta' && typeof delta.thinking === 'string' && delta.thinking !== '') return { r: delta.thinking }
+    if (delta?.type === 'text_delta' && typeof delta.text === 'string' && delta.text !== '') return { t: delta.text }
+    return null
   }
   if (format === 'google') {
-    const cands = j.candidates as Array<{ content?: { parts?: Array<{ text?: unknown }> } }> | undefined
+    const cands = j.candidates as Array<{ content?: { parts?: Array<{ text?: unknown; thought?: unknown }> } }> | undefined
     const parts = cands?.[0]?.content?.parts
     if (!Array.isArray(parts) || parts.length === 0) return null
-    const text = parts.map((p) => (p && typeof p.text === 'string' ? p.text : '')).join('')
-    return text === '' ? null : text
+    const r = pickPart(parts, true)
+    if (r !== '') return { r }
+    const t = pickPart(parts, false)
+    return t === '' ? null : { t }
   }
-  const choices = j.choices as Array<{ delta?: { content?: unknown } }> | undefined
-  const content = choices?.[0]?.delta?.content
-  return typeof content === 'string' && content !== '' ? content : null
+  const delta = (j.choices as Array<{ delta?: { content?: unknown; reasoning_content?: unknown; reasoning?: unknown } }> | undefined)?.[0]?.delta
+  if (delta) {
+    const rc = delta.reasoning_content ?? delta.reasoning
+    if (typeof rc === 'string' && rc !== '') return { r: rc }
+    if (typeof delta.content === 'string' && delta.content !== '') return { t: delta.content }
+  }
+  return null
 }
 
 /**
@@ -175,7 +191,7 @@ export async function* sendChatStream(
   _timeout: number,
   signal: AbortSignal | undefined,
   fetchImpl: typeof fetch = fetch,
-): AsyncGenerator<string> {
+): AsyncGenerator<Delta> {
   const base = withProtocol(normalizeBase(opts.baseUrl))
   if (opts.messages.length === 0) throw new Error('messages 不能为空')
   let url: string

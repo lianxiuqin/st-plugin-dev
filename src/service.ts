@@ -1,13 +1,13 @@
 // agent_plugin_dev/llm-plugin/src/service.ts
 import type { DatabaseSync } from 'node:sqlite'
 import { getPreset, getActivePresetId } from './db.ts'
-import { sendChat, sendChatStream } from './format.ts'
+import { sendChat, sendChatStream, type Delta } from './format.ts'
 
 export type LlmPromptRole = 'system' | 'user' | 'assistant'
 export interface LlmPromptMessage { role: LlmPromptRole; content: string }
 export interface LlmPromptService {
   send(messages: LlmPromptMessage[]): Promise<unknown>
-  stream(messages: LlmPromptMessage[], opts?: { signal?: AbortSignal }): AsyncIterable<string>
+  stream(messages: LlmPromptMessage[], opts?: { signal?: AbortSignal }): AsyncIterable<Delta>
 }
 
 const VALID_ROLES: LlmPromptRole[] = ['system', 'user', 'assistant']
