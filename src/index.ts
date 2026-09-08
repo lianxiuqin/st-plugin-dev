@@ -15,9 +15,9 @@ declare module 'cordis' {
     promptRegister: { register(o: { id: string; name: string; fn: () => string | Promise<string> }): () => void }
     llmPrompt: {
       send(messages: ChatMessage[]): Promise<unknown>
-      stream(messages: ChatMessage[], opts?: { signal?: AbortSignal }): AsyncIterable<string>
+      stream(messages: ChatMessage[], opts?: { signal?: AbortSignal }): AsyncIterable<{ r: string } | { t: string }>
     }
-    chatStreamer: { stream(text: string, opts?: { signal?: AbortSignal }): AsyncIterable<string> }
+    chatStreamer: { stream(text: string, opts?: { signal?: AbortSignal }): AsyncIterable<{ r: string } | { t: string }> }
   }
 }
 

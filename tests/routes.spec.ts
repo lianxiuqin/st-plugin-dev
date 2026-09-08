@@ -15,7 +15,7 @@ function capture() {
     if (text === 'boom') throw new Error('请求超时')
     await session.append('user', text)
     await session.append('assistant', '收到:' + text)
-    return '收到:' + text
+    return { reply: '收到:' + text, reasoning: null }
   })
   const handlers = new Map<string, (req: IncomingMessage, res: ServerResponse) => void | Promise<void>>()
   const dispose = registerRoutes((o) => { handlers.set(o.path, o.handler); return () => handlers.delete(o.path) }, { session, send })
@@ -42,11 +42,20 @@ describe('chat routes v2', () => {
     const r1 = await c.call('/api/chat/send', { text: '你好' }, 'POST')
     expect(r1.status).toBe(200)
     expect(r1.json.data.reply).toBe('收到:你好')
+    expect(r1.json.data.reasoning).toBeNull()
     const list = await c.call('/api/chat/messages')
     expect(list.status).toBe(200)
     expect(list.json.data.map((m: { role: string }) => m.role)).toEqual(['user', 'assistant'])
     expect(list.json.data[0].content).toBe('你好')
     expect(c.send).toHaveBeenCalledWith('你好')
+    c.dispose()
+  })
+
+  it('send 返回带 reasoning 时响应透传', async () => {
+    const c = capture()
+    c.send.mockResolvedValueOnce({ reply: '答', reasoning: '链' })
+    const r = await c.call('/api/chat/send', { text: 'hi' }, 'POST')
+    expect(r.json.data).toEqual({ reply: '答', reasoning: '链' })
     c.dispose()
   })
 

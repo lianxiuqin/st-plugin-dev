@@ -41,7 +41,7 @@ function notAllowed(res: ServerResponse): void {
  *   GET  /api/chat/messages   当前会话全量消息(id 升序)
  *   POST /api/chat/send       发送一轮({text});失败整轮回滚,错误映射 400/409/502/500
  */
-export function registerRoutes(register: Register, dep: { session: SessionLike; send: (text: string) => Promise<string> }): () => void {
+export function registerRoutes(register: Register, dep: { session: SessionLike; send: (text: string) => Promise<{ reply: string; reasoning: string | null }> }): () => void {
   const disposers: Array<() => void> = []
   const { session, send } = dep
 
@@ -61,8 +61,8 @@ export function registerRoutes(register: Register, dep: { session: SessionLike; 
         if (seg[0] === 'send' && seg.length === 1) {
           if (method !== 'POST') return notAllowed(res)
           const { text } = await parseBody<{ text?: unknown }>(req)
-          const reply = await send(String(text ?? ''))
-          return ok(res, { reply })
+          const { reply, reasoning } = await send(String(text ?? ''))
+          return ok(res, { reply, reasoning })
         }
         return fail(res, 404, '接口不存在')
       } catch (e) {

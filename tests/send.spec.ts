@@ -25,14 +25,23 @@ function makeDep(over: Partial<{ chaining: ChainingLike; llm: LlmLike; session: 
 }
 
 describe('chat send v2', () => {
-  it('成功:探测会话+active form+history/input → build → llm → append user+assistant,返回 reply,pending 清空', async () => {
+  it('成功:探测会话+active form+history/input → build → llm → append user+assistant,返回 {reply, reasoning:null},pending 清空', async () => {
     const d = makeDep()
-    const reply = await sendMessage(d, '  你好  ')
+    const { reply, reasoning } = await sendMessage(d, '  你好  ')
     expect(reply).toBe('你好!')
+    expect(reasoning).toBeNull()
     expect(d.chaining.build).toHaveBeenCalledWith('f_chat')
     expect(d.session.append).toHaveBeenNthCalledWith(1, 'user', '你好')
     expect(d.session.append).toHaveBeenNthCalledWith(2, 'assistant', '你好!')
     expect(d.pending.set).toHaveBeenLastCalledWith(null)
+  })
+
+  it('成功且模型返回思维链:reasoning 取自 message.reasoning_content,assistant 仍只存正文', async () => {
+    const d = makeDep({ llm: { send: vi.fn(async () => ({ choices: [{ message: { reasoning_content: '先想', content: '结论' } }] })) } })
+    const { reply, reasoning } = await sendMessage(d, 'hi')
+    expect(reply).toBe('结论')
+    expect(reasoning).toBe('先想')
+    expect(d.session.append).toHaveBeenNthCalledWith(2, 'assistant', '结论')
   })
 
   it('text 为空 → 400 语义,不触碰 session/pending', async () => {
